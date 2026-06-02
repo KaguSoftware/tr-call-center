@@ -1,0 +1,30 @@
+type Props = {
+  label: string;
+  value: string;
+  // Optional delta — render as small chip below the number.
+  delta?: {
+    text: string;             // e.g. "+%12" or "↑ 3"
+    kind: "good" | "bad" | "neutral";
+  } | null;
+  // Tiny line under the value (e.g. "X işleniyor")
+  hint?: string;
+};
+
+export function StatCard({ label, value, delta, hint }: Props) {
+  const chip =
+    delta?.kind === "good" ? "badge-success" :
+    delta?.kind === "bad"  ? "badge-danger"  : "badge-muted";
+
+  return (
+    <div className="panel p-4 md:p-5">
+      <div className="text-xs text-muted uppercase tracking-wide">{label}</div>
+      <div className="mt-2 text-3xl md:text-4xl font-bold tracking-tight text-fg fa-nums">{value}</div>
+      <div className="mt-2.5 flex items-center gap-2 min-h-[1.25rem]">
+        {delta && (
+          <span className={`badge ${chip} text-xs fa-nums`}>{delta.text}</span>
+        )}
+        {hint && <span className="text-xs text-muted">{hint}</span>}
+      </div>
+    </div>
+  );
+}

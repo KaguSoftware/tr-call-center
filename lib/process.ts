@@ -1,0 +1,252 @@
+// Shared processing pipeline used by both /api/process/[id] (reprocess) and
+// /api/process/next (serial worker).
+//
+// Caller must ensure the row is already in `analyzing` state before calling
+// (the claim RPC does this for the serial worker; the per-id route does it
+// explicitly).
+
+import { after } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { analyzeAudio, TransientAIError } from "@/lib/ai";
+import { extractPhoneFromFilename } from "@/lib/phone";
+import { createServiceClient } from "@/lib/supabase/server";
+
+async function isAborted(sb: SupabaseClient, id: string): Promise<boolean> {
+  const { data } = await sb.from("calls").select("status").eq("id", id).maybeSingle();
+  if (!data) return true; // row deleted
+  // If status flipped to 'failed', another writer (cancel button) won.
+  if (data.status === "failed") return true;
+  return false;
+}
+
+export async function processCall(
+  sb: SupabaseClient,
+  id: string,
+  audioPath: string,
+  filenameHint: string | null,
+): Promise<{ transient: boolean }> {
+  const startMs = Date.now();
+  try {
+    const { data: signed, error: signErr } = await sb.storage
+      .from("call-audio")
+      .createSignedUrl(audioPath, 60 * 10);
+    if (signErr || !signed) throw new Error(`Dosya alınamadı: ${signErr?.message ?? "unknown"}`);
+
+    const resp = await fetch(signed.signedUrl);
+    if (!resp.ok) throw new Error(`Ses dosyası indirilemedi (${resp.status})`);
+    const blob = await resp.blob();
+
+    const storedName = audioPath.split("/").pop() || "audio";
+    const file = new File([blob], storedName, { type: blob.type || "audio/mpeg" });
+
+    const hintName = filenameHint || storedName;
+    const phoneHint = extractPhoneFromFilename(hintName);
+
+    const { analysis } = await analyzeAudio(file, { filenameHint: hintName, phoneHint });
+
+    if (!analysis.transcript || analysis.transcript.trim().length === 0) {
+      // Empty transcript is usually transient on Vertex (content filter
+      // flicker, partial response). Bounce back to pending so the cron
+      // retries instead of permanently failing the row.
+      throw new TransientAIError("Görüşme metni çıkarılamadı. Yeniden deneme otomatik olarak yapılacak.");
+    }
+
+    if (await isAborted(sb, id)) return { transient: false };
+
+    const finalPhone = analysis.caller_phone || phoneHint;
+
+    const elapsedSec = Math.max(1, Math.round((Date.now() - startMs) / 1000));
+
+    await sb.from("calls").update({
+      transcript: analysis.transcript,
+      caller_name: analysis.caller_name,
+      caller_phone: finalPhone,
+      agent_name: analysis.agent_name,
+      issue_summary: analysis.issue_summary,
+      resolved: analysis.resolved,
+      category: analysis.category,
+      tags: analysis.tags,
+      agent_behavior: analysis.agent_behavior,
+      caller_behavior: analysis.caller_behavior,
+      sentiment_agent: analysis.sentiment_agent,
+      sentiment_caller: analysis.sentiment_caller,
+      follow_up_needed: analysis.follow_up_needed,
+      notes: analysis.notes,
+      processing_seconds: elapsedSec,
+      status: "done",
+    }).eq("id", id);
+    return { transient: false };
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Bilinmeyen hata";
+    if (await isAborted(sb, id)) return { transient: false };
+
+    // Transient (Gemini overloaded / rate limit / network blip): revert to
+    // pending and let the cron retry later. Stash the message in
+    // error_message so the UI can show *why* it's still queued.
+    if (e instanceof TransientAIError) {
+      console.warn(`[processCall] ${id} transient: ${message} — reverting to pending`);
+      await sb.from("calls").update({
+        status: "pending",
+        processing_started_at: null,
+        error_message: message,
+      }).eq("id", id);
+      return { transient: true };
+    }
+
+    // Permanent failure — mark failed, worker will continue to the next row.
+    // Strip noisy SDK detail from the user-visible message: the SDK often
+    // appends the full JSON error body. Keep the first ~200 chars so
+    // operators can still debug from the dashboard.
+    console.error(`[processCall] ${id} permanent failure:`, message);
+    const cleanMessage = sanitizeErrorMessage(message);
+    await sb.from("calls").update({
+      status: "failed",
+      error_message: cleanMessage,
+    }).eq("id", id);
+    return { transient: false };
+  }
+}
+
+function sanitizeErrorMessage(raw: string): string {
+  // Cut off any JSON body the SDK pasted in.
+  const cut = raw.split(/\{"error":/)[0].trim();
+  const trimmed = cut.length > 0 ? cut : raw;
+  return trimmed.length > 240 ? trimmed.slice(0, 237) + "…" : trimmed;
+}
+
+// Claim the oldest pending call and process it in the background via after().
+// Returns immediately after the claim — the actual Gemini call runs after the
+// caller's response is sent. When it finishes, kicks itself again to grab
+// the next pending row.
+//
+// Safe to call from anywhere a Next.js request context exists (route handler,
+// server action, server component) — that's where after() can register
+// background work. Idempotent: if no pending row, returns { claimed: false }.
+export async function claimAndProcessNext(): Promise<
+  { claimed: false; reason?: "busy" | "empty" } | { claimed: true; id: string }
+> {
+  const sb = createServiceClient();
+
+  // Enforce serial processing: if any row is currently in flight, don't
+  // claim another one. The currently-running worker will chain to the next
+  // pending row when it finishes (or the cron will, if it failed transient).
+  // This is what keeps 50 concurrent uploads from spawning 50 parallel
+  // Gemini calls.
+  const { count: inFlight, error: countErr } = await sb
+    .from("calls")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["analyzing", "transcribing"]);
+  if (countErr) {
+    console.error("[claimAndProcessNext] in-flight count failed:", countErr.message);
+    throw new Error(countErr.message);
+  }
+  if ((inFlight ?? 0) > 0) {
+    console.log(`[claimAndProcessNext] skip — ${inFlight} already in flight`);
+    return { claimed: false, reason: "busy" };
+  }
+
+  const { data, error } = await sb.rpc("claim_next_call");
+  if (error) {
+    console.error("[claimAndProcessNext] claim_next_call failed:", error.message);
+    throw new Error(error.message);
+  }
+  const claimed = (data as Array<{ id: string; audio_path: string; original_filename: string | null }> | null)?.[0];
+  if (!claimed) {
+    console.log("[claimAndProcessNext] no pending calls");
+    return { claimed: false, reason: "empty" };
+  }
+
+  console.log(`[claimAndProcessNext] claimed ${claimed.id} (${claimed.original_filename ?? claimed.audio_path}) — processing in background`);
+
+  after(async () => {
+    const t0 = Date.now();
+    const result = await processCall(sb, claimed.id, claimed.audio_path, claimed.original_filename);
+    console.log(`[claimAndProcessNext] finished ${claimed.id} in ${Math.round((Date.now() - t0) / 1000)}s (transient=${result.transient})`);
+    // If Gemini is overloaded, pause the queue — the /api/retry-pending cron
+    // will pick things back up. Otherwise chain to the next pending row.
+    if (result.transient) {
+      console.warn("[claimAndProcessNext] queue paused due to transient AI error; cron will retry");
+      return;
+    }
+    try {
+      await claimAndProcessNext();
+    } catch (e) {
+      console.error("[claimAndProcessNext] chain failed:", e);
+    }
+  });
+
+  return { claimed: true, id: claimed.id };
+}
+
+// Synchronous variant of claimAndProcessNext: runs processCall inline and
+// waits for it to finish before returning. Used by the cron route so the
+// retry actually completes within the cron invocation (`after()` callbacks
+// can be cut off when the function instance shuts down). If the call
+// succeeds, this also chains to the next pending row inline.
+//
+// Returns counts so the cron response is observable.
+export async function processNextInline(maxChain = 5): Promise<{
+  processed: number;
+  transientStopped: boolean;
+  drained: boolean;
+  swept: number;
+}> {
+  const sb = createServiceClient();
+  let processed = 0;
+  let transientStopped = false;
+
+  // Sweep rows stuck in analyzing/transcribing for >2 min. A normal Gemini
+  // call on a 20MB audio finishes well under 90s; anything older almost
+  // certainly means the worker instance was killed mid-call (after() callback
+  // cut short by a Vercel function shutdown, OOM, eviction). Without this,
+  // the queue can deadlock because the inFlight check below sees a stuck row
+  // and skips forever.
+  const staleCutoff = new Date(Date.now() - 2 * 60_000).toISOString();
+  const { data: swept, error: sweepErr } = await sb
+    .from("calls")
+    .update({
+      status: "pending",
+      processing_started_at: null,
+      error_message: "Sunucu kesintisi nedeniyle işlem sıfırlandı",
+    })
+    .in("status", ["analyzing", "transcribing"])
+    .lt("processing_started_at", staleCutoff)
+    .select("id");
+  const sweptCount = swept?.length ?? 0;
+  if (sweepErr) {
+    console.warn("[processNextInline] sweep failed:", sweepErr.message);
+  } else if (sweptCount > 0) {
+    console.warn(`[processNextInline] swept ${sweptCount} stuck row(s) back to pending`);
+  }
+
+  for (let i = 0; i < maxChain; i++) {
+    // Don't claim if something else is already working.
+    const { count: inFlight, error: countErr } = await sb
+      .from("calls")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["analyzing", "transcribing"]);
+    if (countErr) throw new Error(countErr.message);
+    if ((inFlight ?? 0) > 0) {
+      console.log(`[processNextInline] skip — ${inFlight} already in flight`);
+      return { processed, transientStopped: false, drained: false, swept: sweptCount };
+    }
+
+    const { data, error } = await sb.rpc("claim_next_call");
+    if (error) throw new Error(error.message);
+    const claimed = (data as Array<{ id: string; audio_path: string; original_filename: string | null }> | null)?.[0];
+    if (!claimed) {
+      return { processed, transientStopped, drained: true, swept: sweptCount };
+    }
+
+    console.log(`[processNextInline] processing ${claimed.id} inline`);
+    const t0 = Date.now();
+    const result = await processCall(sb, claimed.id, claimed.audio_path, claimed.original_filename);
+    console.log(`[processNextInline] finished ${claimed.id} in ${Math.round((Date.now() - t0) / 1000)}s (transient=${result.transient})`);
+    processed++;
+    if (result.transient) {
+      transientStopped = true;
+      return { processed, transientStopped, drained: false, swept: sweptCount };
+    }
+  }
+  return { processed, transientStopped, drained: false, swept: sweptCount };
+}

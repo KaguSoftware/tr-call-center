@@ -1,0 +1,10 @@
+node_modules
+.next
+.env.local
+.env*.local
+*.log
+.DS_Store
+.vercel
+next-env.d.ts
+.claude/
+gen-lang-client-0324926987-e5c5f792d358.json
