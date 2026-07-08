@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { login } from "./actions";
 import { t } from "@/lib/strings";
 
 export function LoginForm() {
@@ -16,9 +16,12 @@ export function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await login(email, password);
     setLoading(false);
+    if (error === "rate_limited") {
+      setError(t.loginRateLimited);
+      return;
+    }
     if (error) {
       setError(t.loginError);
       return;

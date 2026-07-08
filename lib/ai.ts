@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const MODEL = "gemini-2.5-flash-lite";
 
-const PROJECT = process.env.GOOGLE_CLOUD_PROJECT ?? "gen-lang-client-0324926987";
+const PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
 const LOCATION = process.env.GOOGLE_CLOUD_LOCATION ?? "us-central1";
 
 // Lazy client: don't crash at module-eval time (e.g. during `next build` page
@@ -19,6 +19,10 @@ function client(): GoogleGenAI {
     throw new Error(
       "Vertex AI kimlik doğrulaması yapılandırılmadı: GOOGLE_CREDENTIALS_JSON (Vercel'de) veya GOOGLE_APPLICATION_CREDENTIALS (yerelde) değişkenini ayarlayın."
     );
+  }
+
+  if (!PROJECT) {
+    throw new Error("GOOGLE_CLOUD_PROJECT ayarlanmadı.");
   }
 
   const opts: ConstructorParameters<typeof GoogleGenAI>[0] = {

@@ -43,6 +43,7 @@ export const t = {
   loginBtn: "Giriş",
   loggingIn: "Giriş yapılıyor…",
   loginError: "E-posta veya parola hatalı",
+  loginRateLimited: "Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.",
 
   // Upload
   uploadTitle: "Çağrı Ses Dosyası Yükle",
