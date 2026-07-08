@@ -14,6 +14,9 @@ const ACCENT_RGB: [number, number, number] = [46, 158, 143]; // brand teal-green
 const MUTED_RGB: [number, number, number] = [100, 116, 139]; // slate-500
 const TEXT_RGB: [number, number, number] = [15, 23, 42]; // slate-900
 const BORDER_RGB: [number, number, number] = [226, 232, 240]; // slate-200
+const LINK_RGB: [number, number, number] = [37, 99, 235]; // blue-600, speaker labels
+
+const SPEAKER_LABEL = /^([^:\n]{1,30}:)(\s*)/;
 
 const PAGE_WIDTH = 210; // A4 mm
 const PAGE_HEIGHT = 297;
@@ -110,13 +113,35 @@ export function downloadCallPdf(call: Call) {
   y += 6;
 
   const transcript = call.transcript ? cleanTranscript(call.transcript) : t.unknown;
-  const lines = doc.splitTextToSize(transcript, CONTENT_WIDTH);
   const lineHeight = 5;
-  for (const line of lines) {
+  doc.setFontSize(9.5);
+  for (const rawLine of transcript.split("\n")) {
+    const match = rawLine.match(SPEAKER_LABEL);
+    if (!match) {
+      const wrapped = doc.splitTextToSize(rawLine || " ", CONTENT_WIDTH);
+      for (const w of wrapped) {
+        y = ensureSpace(doc, y, lineHeight);
+        doc.setTextColor(...TEXT_RGB);
+        doc.text(w, MARGIN, y);
+        y += lineHeight;
+      }
+      continue;
+    }
+
+    const [, label, space] = match;
+    const rest = rawLine.slice(match[0].length);
     y = ensureSpace(doc, y, lineHeight);
-    doc.setFontSize(9.5);
+    doc.setTextColor(...LINK_RGB);
+    doc.text(label, MARGIN, y);
+    const labelWidth = doc.getTextWidth(label + space);
     doc.setTextColor(...TEXT_RGB);
-    doc.text(line, MARGIN, y);
+
+    const wrapped = doc.splitTextToSize(rest, CONTENT_WIDTH - labelWidth);
+    wrapped.forEach((w: string, i: number) => {
+      if (i > 0) y = ensureSpace(doc, y, lineHeight);
+      doc.text(w, MARGIN + (i === 0 ? labelWidth : 0), y);
+      if (i < wrapped.length - 1) y += lineHeight;
+    });
     y += lineHeight;
   }
 

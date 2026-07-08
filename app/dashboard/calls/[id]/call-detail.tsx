@@ -10,6 +10,7 @@ import { SentimentDot } from "@/components/sentiment-dot";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { cleanTranscript, formatTrDate, resolvedLabel, t } from "@/lib/strings";
+import { TranscriptView } from "@/components/transcript-view";
 import { cancelCall, deleteCall } from "@/lib/actions";
 import { kickWorker } from "@/app/dashboard/upload/actions";
 import { QueueInfo, medianProcessingSeconds } from "@/components/queue-info";
@@ -305,7 +306,7 @@ export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: str
           <h2 className="text-sm font-semibold text-muted mb-4">{t.transcript}</h2>
           {call.transcript ? (
             <div className="max-h-[70vh] overflow-y-auto leading-8 whitespace-pre-wrap text-sm pe-2">
-              {cleanTranscript(call.transcript)}
+              <TranscriptView transcript={cleanTranscript(call.transcript)} />
             </div>
           ) : isProcessing ? (
             <div className="space-y-2">
