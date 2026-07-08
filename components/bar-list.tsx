@@ -6,7 +6,7 @@ type Item = {
 
 type Props = {
   items: Item[];
-  // Optional palette: tint bars by category. Default is solid black.
+  // Optional palette: tint bars by category. Default is the brand accent.
   tone?: "accent" | "sentiment" | "resolution";
   // Show the bar background as a track for empty/zero values.
   emptyMessage?: string;
@@ -17,9 +17,9 @@ const SENTIMENT_TONES = ["bg-green-500", "bg-amber-500", "bg-red-500"];
 const RESOLUTION_TONES = ["bg-green-500", "bg-red-500", "bg-zinc-400"];
 
 function toneFor(tone: Props["tone"], i: number): string {
-  if (tone === "sentiment") return SENTIMENT_TONES[i] ?? "bg-fg";
-  if (tone === "resolution") return RESOLUTION_TONES[i] ?? "bg-fg";
-  return "bg-fg";
+  if (tone === "sentiment") return SENTIMENT_TONES[i] ?? "bg-accent";
+  if (tone === "resolution") return RESOLUTION_TONES[i] ?? "bg-accent";
+  return "bg-accent";
 }
 
 export function BarList({ items, tone = "accent", emptyMessage }: Props) {

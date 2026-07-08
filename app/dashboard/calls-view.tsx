@@ -19,7 +19,7 @@ import { Select } from "@/components/select";
 import { Segmented } from "@/components/segmented";
 import { DateField } from "@/components/date-field";
 import { AnimatePresence } from "framer-motion";
-import { Trash2, Loader2, Play, StopCircle, AlertTriangle, Mic, Search, SlidersHorizontal, X, RotateCcw } from "lucide-react";
+import { Trash2, Loader2, Play, StopCircle, AlertTriangle, Mic, Search, SlidersHorizontal, X, RotateCcw, Phone, CheckCircle2, Clock } from "lucide-react";
 
 type ResolvedFilter = "all" | "yes" | "no";
 type SentimentFilter = "all" | Sentiment;
@@ -168,6 +168,7 @@ export function CallsView({ initial }: { initial: Call[] }) {
     () => calls.filter((c) => c.status === "pending" || c.status === "analyzing" || c.status === "transcribing").length,
     [calls],
   );
+  const doneCount = useMemo(() => calls.filter((c) => c.status === "done").length, [calls]);
   // Heuristic: if any pending row carries an error_message, the AI is busy
   // and the cron is the one driving recovery. Show a calm banner so users
   // know it's expected.
@@ -199,6 +200,13 @@ export function CallsView({ initial }: { initial: Call[] }) {
         </Link>
       </div>
 
+      <StatsOverview
+        total={calls.length}
+        done={doneCount}
+        processing={processingCount}
+        failed={failedCount}
+      />
+
       {aiBusy && <AIBusyBanner stuckCount={stuckCount} latestErrorMessage={latestErrorMessage} />}
       {(failedCount > 0 || processingCount > 0) && (
         <BulkActionsBar
@@ -215,7 +223,7 @@ export function CallsView({ initial }: { initial: Call[] }) {
             <Search className="absolute inset-y-0 start-3 my-auto w-4 h-4 text-muted pointer-events-none" />
             <input
               type="text"
-              className="input ps-10 pe-3"
+              className="input !ps-10 !pe-3"
               placeholder={t.search}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -621,6 +629,42 @@ type RetryResult = {
   swept: number;
   error?: string;
 };
+
+function StatsOverview({
+  total,
+  done,
+  processing,
+  failed,
+}: {
+  total: number;
+  done: number;
+  processing: number;
+  failed: number;
+}) {
+  const cards = [
+    { label: t.dashboardTitle, value: total, icon: Phone, tone: "text-accent", ring: "bg-accent/10" },
+    { label: t.statusDone, value: done, icon: CheckCircle2, tone: "text-success", ring: "bg-success/10" },
+    { label: t.statusAnalyzing, value: processing, icon: Clock, tone: "text-warn", ring: "bg-warn/10" },
+    { label: t.statusFailed, value: failed, icon: AlertTriangle, tone: "text-danger", ring: "bg-danger/10" },
+  ];
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {cards.map((c) => (
+        <div key={c.label} className="panel p-3.5 flex items-center gap-3">
+          <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${c.ring}`}>
+            <c.icon className={`w-5 h-5 ${c.tone}`} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-2xl font-bold tracking-tight text-fg fa-nums leading-none">
+              {c.value.toLocaleString("tr-TR")}
+            </div>
+            <div className="text-xs text-muted truncate mt-1">{c.label}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function AIBusyBanner({
   stuckCount,

@@ -35,6 +35,19 @@ body {
 /* Audio element — light theme */
 audio { color-scheme: light; height: 38px; }
 
+/* Brand logo mark — lime→teal gradient matching the logo. */
+.brand-mark {
+  background: linear-gradient(135deg, #7ec45a 0%, #2e9e8f 55%, #1f7a78 100%);
+  color: #ffffff;
+}
+
+/* Auth backdrop — faint brand wash behind the login card. */
+.auth-bg {
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgb(46 158 143 / 0.10) 0%, transparent 70%),
+    #f8fafc;
+}
+
 /* Card / panel */
 .panel {
   background: #ffffff;
@@ -56,8 +69,8 @@ audio { color-scheme: light; height: 38px; }
 }
 .input::placeholder { color: #94a3b8; }
 .input:focus {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgb(79 70 229 / 0.15);
+  border-color: #2e9e8f;
+  box-shadow: 0 0 0 3px rgb(46 158 143 / 0.18);
 }
 
 /* Buttons */
@@ -83,13 +96,15 @@ audio { color-scheme: light; height: 38px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-primary {
-  background: #4f46e5;
-  border-color: #4f46e5;
+  background: #2e9e8f;
+  border-color: #2e9e8f;
   color: #ffffff;
+  box-shadow: 0 1px 2px rgb(46 158 143 / 0.25);
 }
 .btn-primary:hover:not(:disabled) {
-  background: #4338ca;
-  border-color: #4338ca;
+  background: #26867a;
+  border-color: #26867a;
+  box-shadow: 0 2px 8px rgb(46 158 143 / 0.30);
 }
 
 .btn-ghost {
@@ -126,7 +141,7 @@ audio { color-scheme: light; height: 38px; }
 .badge-success { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
 .badge-danger  { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
 .badge-warn    { background: #fef3c7; color: #92400e; border-color: #fde68a; }
-.badge-info    { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
+.badge-info    { background: #d6f0ec; color: #1f6b60; border-color: #b3e2da; }
 .badge-muted   { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
 
 /* Skeleton shimmer */
@@ -164,11 +179,11 @@ audio { color-scheme: light; height: 38px; }
 }
 
 /* Selection */
-::selection { background: #4f46e5; color: #ffffff; }
+::selection { background: #2e9e8f; color: #ffffff; }
 
 /* Focus ring for keyboard nav on non-form elements */
 :focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid #2e9e8f;
   outline-offset: 2px;
   border-radius: 6px;
 }

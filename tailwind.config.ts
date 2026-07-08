@@ -13,7 +13,7 @@ const config: Config = {
         latin: ["var(--font-inter)", "system-ui", "sans-serif"],
       },
       colors: {
-        // Modern slate + indigo theme.
+        // Modern slate base + teal-green accent (from logo).
         bg: "#f8fafc",         // slate-50
         surface: "#ffffff",
         surface2: "#f1f5f9",   // slate-100
@@ -26,12 +26,12 @@ const config: Config = {
         panel: "#ffffff",
         panel2: "#f1f5f9",
         text: "#0f172a",
-        accent: "#4f46e5",     // indigo-600
-        accent2: "#4338ca",    // indigo-700
+        accent: "#2e9e8f",     // logo teal-green
+        accent2: "#26867a",    // darker teal-green (hover)
         success: "#16a34a",
         warn: "#d97706",
         danger: "#dc2626",
-        info: "#4f46e5",       // indigo-600
+        info: "#2e9e8f",       // logo teal-green
       },
       boxShadow: {
         flat: "0 1px 2px rgb(15 23 42 / 0.06)",

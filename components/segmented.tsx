@@ -53,13 +53,13 @@ export function Segmented<T extends string>({
               "relative inline-flex items-center justify-center gap-1.5 rounded-md transition-colors whitespace-nowrap " +
               itemCls +
               " " +
-              (active ? "text-fg font-medium" : "text-muted hover:text-fg")
+              (active ? "text-accent font-medium" : "text-muted hover:text-fg")
             }
           >
             {active && (
               <motion.span
                 layoutId={`segmented-pill-${groupId}`}
-                className="absolute inset-0 bg-surface rounded-md shadow-flat border border-border"
+                className="absolute inset-0 bg-accent/10 rounded-md shadow-flat border border-accent/30"
                 transition={{ type: "spring", stiffness: 380, damping: 32 }}
               />
             )}

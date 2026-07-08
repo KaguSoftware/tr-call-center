@@ -16,7 +16,7 @@ export function StatCard({ label, value, delta, hint }: Props) {
     delta?.kind === "bad"  ? "badge-danger"  : "badge-muted";
 
   return (
-    <div className="panel p-4 md:p-5">
+    <div className="panel p-4 md:p-5 border-t-2 border-t-accent">
       <div className="text-xs text-muted uppercase tracking-wide">{label}</div>
       <div className="mt-2 text-3xl md:text-4xl font-bold tracking-tight text-fg fa-nums">{value}</div>
       <div className="mt-2.5 flex items-center gap-2 min-h-[1.25rem]">

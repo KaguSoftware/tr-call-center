@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu } from "lucide-react";
+import { Menu, LayoutDashboard, BarChart3, UploadCloud } from "lucide-react";
 import { LogoutButton } from "./logout-button";
 import { ToastProvider } from "@/components/toast";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -18,16 +18,16 @@ export function Shell({ children, email }: { children: React.ReactNode; email: s
   const [open, setOpen] = useState(false);
 
   const navItems = [
-    { href: "/dashboard", label: t.navDashboard },
-    { href: "/dashboard/summary", label: t.navSummary },
-    { href: "/dashboard/upload", label: t.navUpload },
+    { href: "/dashboard", label: t.navDashboard, icon: LayoutDashboard },
+    { href: "/dashboard/summary", label: t.navSummary, icon: BarChart3 },
+    { href: "/dashboard/upload", label: t.navUpload, icon: UploadCloud },
   ];
 
   const Sidebar = (
-    <aside className="w-64 shrink-0 border-l border-border bg-surface flex flex-col h-screen">
+    <aside className="w-64 shrink-0 border-r border-border bg-surface flex flex-col h-screen">
       <div className="p-5 border-b border-border">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-accent flex items-center justify-center text-white font-bold">
+          <div className="h-9 w-9 rounded-xl brand-mark flex items-center justify-center font-bold">
             Ç
           </div>
           <div className="min-w-0">
@@ -48,12 +48,16 @@ export function Shell({ children, email }: { children: React.ReactNode; email: s
               href={item.href}
               onClick={() => setOpen(false)}
               className={
-                "flex items-center px-3 py-2 rounded-lg text-sm transition-colors " +
+                "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors " +
                 (active
-                  ? "bg-surface2 text-fg font-medium"
+                  ? "bg-accent/10 text-accent font-medium"
                   : "text-muted hover:text-fg hover:bg-surface2")
               }
             >
+              {active && (
+                <span className="absolute start-0 inset-y-1.5 w-1 rounded-full bg-accent" />
+              )}
+              <item.icon className="w-[18px] h-[18px] shrink-0" />
               {item.label}
             </Link>
           );
@@ -81,7 +85,7 @@ export function Shell({ children, email }: { children: React.ReactNode; email: s
           {open && (
             <div className="md:hidden fixed inset-0 z-40">
               <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-              <div className="absolute inset-y-0 right-0">{Sidebar}</div>
+              <div className="absolute inset-y-0 left-0">{Sidebar}</div>
             </div>
           )}
 
@@ -98,7 +102,7 @@ export function Shell({ children, email }: { children: React.ReactNode; email: s
                   <Menu className="w-5 h-5" />
                 </button>
                 <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-lg bg-accent flex items-center justify-center text-white font-bold text-sm">Ç</div>
+                  <div className="h-7 w-7 rounded-lg brand-mark flex items-center justify-center font-bold text-sm">Ç</div>
                   <div className="text-sm font-semibold">{t.appShort}</div>
                 </div>
               </div>
