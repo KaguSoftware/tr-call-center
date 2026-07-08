@@ -19,15 +19,13 @@ const PAGE_HEIGHT = 297;
 const MARGIN = 16;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
-let fontRegistered = false;
 function registerFont(doc: jsPDF) {
-  if (!fontRegistered) {
-    doc.addFileToVFS("NotoSans-Regular.ttf", NOTO_SANS_REGULAR_BASE64);
-    doc.addFont("NotoSans-Regular.ttf", "NotoSans", "normal");
-    doc.addFileToVFS("NotoSans-Bold.ttf", NOTO_SANS_BOLD_BASE64);
-    doc.addFont("NotoSans-Bold.ttf", "NotoSans", "bold");
-    fontRegistered = true;
-  }
+  // Every downloadCallPdf() call creates a brand new jsPDF instance, so the
+  // font must be (re-)registered on each one — it doesn't carry over.
+  doc.addFileToVFS("NotoSans-Regular.ttf", NOTO_SANS_REGULAR_BASE64);
+  doc.addFont("NotoSans-Regular.ttf", "NotoSans", "normal");
+  doc.addFileToVFS("NotoSans-Bold.ttf", NOTO_SANS_BOLD_BASE64);
+  doc.addFont("NotoSans-Bold.ttf", "NotoSans", "bold");
   doc.setFont("NotoSans", "normal");
 }
 
