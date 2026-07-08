@@ -12,6 +12,14 @@ let _client: GoogleGenAI | null = null;
 function client(): GoogleGenAI {
   if (_client) return _client;
 
+  // Fallback: plain Gemini Developer API key. Used while Vertex AI billing
+  // is still being set up on the GCP project — drop once Vertex is live.
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (apiKey) {
+    _client = new GoogleGenAI({ apiKey });
+    return _client;
+  }
+
   const inlineJson = process.env.GOOGLE_CREDENTIALS_JSON;
   const credFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
