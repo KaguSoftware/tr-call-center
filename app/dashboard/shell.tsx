@@ -7,6 +7,7 @@ import { Menu, LayoutDashboard, BarChart3, UploadCloud } from "lucide-react";
 import { LogoutButton } from "./logout-button";
 import { ToastProvider } from "@/components/toast";
 import { ConfirmProvider } from "@/components/confirm-dialog";
+import { ActivityProvider } from "@/components/activity-bar";
 import { ConnectionIndicator } from "@/components/connection-indicator";
 import { RealtimeProvider } from "@/lib/realtime-context";
 import { UploadProvider } from "@/lib/upload-context";
@@ -73,7 +74,8 @@ export function Shell({ children, email }: { children: React.ReactNode; email: s
   );
 
   return (
-    <ToastProvider>
+    <ActivityProvider>
+      <ToastProvider>
       <ConfirmProvider>
         <RealtimeProvider>
         <UploadProvider>
@@ -114,6 +116,7 @@ export function Shell({ children, email }: { children: React.ReactNode; email: s
         </UploadProvider>
         </RealtimeProvider>
       </ConfirmProvider>
-    </ToastProvider>
+      </ToastProvider>
+    </ActivityProvider>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "./actions";
 import { t } from "@/lib/strings";
+import { Loader2 } from "lucide-react";
 
 export function LoginForm() {
   const router = useRouter();
@@ -61,7 +62,12 @@ export function LoginForm() {
           {error}
         </div>
       )}
-      <button type="submit" disabled={loading} className="btn btn-primary w-full">
+      <button
+        type="submit"
+        disabled={loading}
+        className="btn btn-primary w-full inline-flex items-center justify-center gap-1.5"
+      >
+        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
         {loading ? t.loggingIn : t.loginBtn}
       </button>
     </form>

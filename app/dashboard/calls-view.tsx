@@ -19,6 +19,7 @@ import { Select } from "@/components/select";
 import { Segmented } from "@/components/segmented";
 import { DateField } from "@/components/date-field";
 import { AnimatePresence } from "framer-motion";
+import { useTrackedAction } from "@/components/activity-bar";
 import { Trash2, Loader2, Play, StopCircle, AlertTriangle, Mic, Search, SlidersHorizontal, X, RotateCcw, Phone, CheckCircle2, Clock } from "lucide-react";
 
 type ResolvedFilter = "all" | "yes" | "no";
@@ -26,6 +27,7 @@ type SentimentFilter = "all" | Sentiment;
 
 export function CallsView({ initial }: { initial: Call[] }) {
   const [calls, setCalls] = useState<Call[]>(initial);
+  const track = useTrackedAction();
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -93,7 +95,7 @@ export function CallsView({ initial }: { initial: Call[] }) {
     }
     if (rtStatus !== "connected") return;
     let cancelled = false;
-    (async () => {
+    track(async () => {
       const sb = createClient();
       const { data } = await sb
         .from("calls")
@@ -102,10 +104,11 @@ export function CallsView({ initial }: { initial: Call[] }) {
         .limit(500);
       if (cancelled || !data) return;
       setCalls(data as Call[]);
-    })();
+    });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rtStatus]);
 
   const agents = useMemo(() => {

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import { Upload } from "lucide-react";
+import { Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast";
 import { UploadProgressRow } from "@/components/upload-progress-row";
 import { useUpload, type UploadItem } from "@/lib/upload-context";
@@ -153,8 +153,9 @@ export function UploadForm() {
             type="button"
             disabled={queueable === 0 || uploading}
             onClick={uploadAll}
-            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
+            {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
             {uploading
               ? t.uploading
               : queueable === 1

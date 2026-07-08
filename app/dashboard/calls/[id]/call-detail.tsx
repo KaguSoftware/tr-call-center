@@ -16,7 +16,8 @@ import { kickWorker } from "@/app/dashboard/upload/actions";
 import { QueueInfo, medianProcessingSeconds } from "@/components/queue-info";
 import { FadeIn } from "@/components/motion";
 import { downloadCallPdf } from "@/lib/pdf-export";
-import { FileDown } from "lucide-react";
+import { FileDown, Loader2, X, RotateCcw, Trash2 } from "lucide-react";
+import { useTrackedAction } from "@/components/activity-bar";
 
 export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: string | null }) {
   const router = useRouter();
@@ -38,6 +39,8 @@ export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: str
   const [reprocessing, startReprocess] = useTransition();
   const [cancelling, startCancel] = useTransition();
   const [deleting, startDelete] = useTransition();
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const track = useTrackedAction();
 
   // One-shot fetch of queue context (pending + processing + recent done) so
   // QueueInfo can compute position + median ETA. Realtime updates below keep
@@ -79,7 +82,7 @@ export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: str
     : [...queueCalls, call];
 
   function reprocess() {
-    startReprocess(async () => {
+    startReprocess(() => track(async () => {
       const res = await fetch(`/api/process/${call.id}`, { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -87,15 +90,26 @@ export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: str
       } else {
         toast.show("Yeniden analiz başladı", "info");
       }
-    });
+    }));
   }
 
   function handleCancel() {
-    startCancel(async () => {
+    startCancel(() => track(async () => {
       const res = await cancelCall(call.id);
       if (res.error) toast.show(res.error, "error");
       else toast.show("Çağrı iptal edildi", "info");
-    });
+    }));
+  }
+
+  function handleDownloadPdf() {
+    setDownloadingPdf(true);
+    track(async () => {
+      try {
+        downloadCallPdf(call);
+      } catch (e) {
+        toast.show(e instanceof Error ? e.message : "PDF oluşturulamadı", "error");
+      }
+    }).finally(() => setDownloadingPdf(false));
   }
 
   async function handleDelete() {
@@ -107,7 +121,7 @@ export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: str
       kind: "danger",
     });
     if (!ok) return;
-    startDelete(async () => {
+    startDelete(() => track(async () => {
       const res = await deleteCall(call.id);
       if (res.error) {
         toast.show(res.error, "error");
@@ -115,7 +129,7 @@ export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: str
       }
       toast.show("Çağrı silindi", "success");
       router.push("/dashboard");
-    });
+    }));
   }
 
   const isProcessing = call.status === "pending" || call.status === "transcribing" || call.status === "analyzing";
@@ -134,7 +148,12 @@ export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: str
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={call.status} />
             {isProcessing && (
-              <button onClick={handleCancel} disabled={cancelling} className="btn text-sm">
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="btn text-sm inline-flex items-center gap-1.5"
+              >
+                {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
                 {cancelling ? t.cancelling : t.cancel}
               </button>
             )}
@@ -142,21 +161,28 @@ export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: str
               <button
                 onClick={reprocess}
                 disabled={reprocessing}
-                className={"btn text-sm " + (call.status === "failed" ? "btn-primary" : "")}
+                className={"btn text-sm inline-flex items-center gap-1.5 " + (call.status === "failed" ? "btn-primary" : "")}
               >
+                {reprocessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
                 {reprocessing ? t.reprocessing : t.reprocess}
               </button>
             )}
             {call.status === "done" && (
               <button
-                onClick={() => downloadCallPdf(call)}
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
                 className="btn text-sm inline-flex items-center gap-1.5"
               >
-                <FileDown className="w-4 h-4" />
+                {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
                 {t.downloadPdf}
               </button>
             )}
-            <button onClick={handleDelete} disabled={deleting} className="btn btn-danger text-sm">
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="btn btn-danger text-sm inline-flex items-center gap-1.5"
+            >
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               {deleting ? t.deleting : t.delete}
             </button>
           </div>
