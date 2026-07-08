@@ -14,6 +14,8 @@ import { cancelCall, deleteCall } from "@/lib/actions";
 import { kickWorker } from "@/app/dashboard/upload/actions";
 import { QueueInfo, medianProcessingSeconds } from "@/components/queue-info";
 import { FadeIn } from "@/components/motion";
+import { downloadCallPdf } from "@/lib/pdf-export";
+import { FileDown } from "lucide-react";
 
 export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: string | null }) {
   const router = useRouter();
@@ -142,6 +144,15 @@ export function CallDetail({ initial, audioUrl }: { initial: Call; audioUrl: str
                 className={"btn text-sm " + (call.status === "failed" ? "btn-primary" : "")}
               >
                 {reprocessing ? t.reprocessing : t.reprocess}
+              </button>
+            )}
+            {call.status === "done" && (
+              <button
+                onClick={() => downloadCallPdf(call)}
+                className="btn text-sm inline-flex items-center gap-1.5"
+              >
+                <FileDown className="w-4 h-4" />
+                {t.downloadPdf}
               </button>
             )}
             <button onClick={handleDelete} disabled={deleting} className="btn btn-danger text-sm">

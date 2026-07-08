@@ -82,8 +82,16 @@ const RESPONSE_SCHEMA = {
     tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Birkaç kısa Türkçe etiket" },
     agent_behavior: { type: Type.STRING, description: "Temsilcinin davranışının kısa Türkçe açıklaması" },
     caller_behavior: { type: Type.STRING, description: "Arayanın davranışının kısa Türkçe açıklaması" },
-    sentiment_agent: { type: Type.STRING, enum: ["positive", "neutral", "negative"] },
-    sentiment_caller: { type: Type.STRING, enum: ["positive", "neutral", "negative"] },
+    sentiment_agent: {
+      type: Type.STRING,
+      enum: ["positive", "neutral", "negative"],
+      description: "Temsilcinin ton ve tavrı. positive: nazik, yardımsever, güler yüzlü; negative: sabırsız, kaba, ilgisiz veya sinirli; neutral: sadece işlevsel/bilgilendirici, belirgin bir duygusal ton yok. Sesteki gerçek tona göre değerlendir, varsayılan olarak neutral seçme.",
+    },
+    sentiment_caller: {
+      type: Type.STRING,
+      enum: ["positive", "neutral", "negative"],
+      description: "Arayanın ton ve tavrı. positive: memnun, teşekkür eden, dostane; negative: sinirli, hayal kırıklığına uğramış, şikayetçi veya sabırsız; neutral: sadece bilgi almak/vermek amaçlı, belirgin bir duygusal ton yok. Sesteki gerçek tona göre değerlendir, varsayılan olarak neutral seçme.",
+    },
     follow_up_needed: { type: Type.BOOLEAN },
     notes: { type: Type.STRING, description: "Dikkat çeken diğer notlar (Türkçe)" },
   },
@@ -114,7 +122,8 @@ Sana bir çağrı merkezi temsilcisi ile bir müşteri arasındaki Türkçe bir 
 - Tüm metin değerleri Türkçe olmalıdır.
 - Kendinden bir şey ekleme; yalnızca sesin gerçek içeriğine göre yanıt ver.
 - Bilgi seste yoksa, nullable alanlar için null kullan.
-- Sorunun çözülüp çözülmediği belirsizse resolved alanını null bırak.`;
+- Sorunun çözülüp çözülmediği belirsizse resolved alanını null bırak.
+- sentiment_agent ve sentiment_caller için sesteki gerçek tonu (kelime seçimi, ses tonu, sabır/sabırsızlık, teşekkür/şikayet ifadeleri) dikkatle değerlendir. Bu alanlarda "neutral" yalnızca gerçekten belirgin bir duygusal ton yoksa kullanılmalı; çoğu çağrıda taraflardan en az biri açıkça memnun ya da rahatsız olur, bunu yansıt.`;
 
 // ===== Main entry: audio file → transcript + structured analysis =====
 

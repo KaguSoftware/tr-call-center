@@ -93,6 +93,34 @@ export async function retryAllFailed(): Promise<{ count: number; rows: Call[]; e
 	return { count: data?.length ?? 0, rows: (data as Call[]) ?? [] };
 }
 
+// Flip every completed call back to pending so it re-runs through the AI
+// pipeline with the current prompt. Used by the dashboard's "Duygu analizini
+// yenile" button (e.g. after a prompt fix that changes analysis quality).
+export async function reprocessAllSentiment(): Promise<{ count: number; rows: Call[]; error?: string }> {
+	const sb = await createClient();
+
+	const { data, error } = await sb
+		.from("calls")
+		.update({
+			status: "pending",
+			processing_started_at: null,
+			error_message: null,
+		})
+		.eq("status", "done")
+		.select("*");
+
+	if (error) return { count: 0, rows: [], error: error.message };
+
+	try {
+		await claimAndProcessNext();
+	} catch (e) {
+		console.error("[reprocessAllSentiment] kick failed:", e);
+	}
+
+	revalidatePath("/dashboard");
+	return { count: data?.length ?? 0, rows: (data as Call[]) ?? [] };
+}
+
 // Cancel every in-flight call (pending + analyzing + transcribing). Used by
 // the dashboard "Stop all" button. The currently-running Gemini call can't
 // actually be interrupted mid-flight, but processCall checks isAborted()

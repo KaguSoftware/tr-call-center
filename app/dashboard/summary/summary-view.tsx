@@ -7,8 +7,9 @@ import type { Range, SummaryResult, Kpi } from "@/lib/summary";
 import { StatCard } from "@/components/stat-card";
 import { BarList } from "@/components/bar-list";
 import { FadeIn } from "@/components/motion";
-import { Mic } from "lucide-react";
+import { Mic, FileDown } from "lucide-react";
 import { formatTrDateShort, formatTrDayMonth, formatTrPercent, t } from "@/lib/strings";
+import { downloadSummaryExcel } from "@/lib/excel-export";
 
 const RANGE_LABELS: Record<Range, string> = {
   today: t.rangeToday,
@@ -47,9 +48,20 @@ export function SummaryView({ result }: { result: SummaryResult }) {
 
   return (
     <FadeIn className={"space-y-5 transition-opacity " + (pending ? "opacity-60" : "")}>
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-fg">{t.summaryTitle}</h1>
-        <p className="text-sm text-muted mt-1">{t.summarySubtitle}</p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-fg">{t.summaryTitle}</h1>
+          <p className="text-sm text-muted mt-1">{t.summarySubtitle}</p>
+        </div>
+        {result.totalCalls.value > 0 && (
+          <button
+            onClick={() => downloadSummaryExcel(result, RANGE_LABELS[result.range])}
+            className="btn text-sm inline-flex items-center gap-1.5"
+          >
+            <FileDown className="w-4 h-4" />
+            {t.downloadExcel}
+          </button>
+        )}
       </div>
 
       {/* Range selector */}

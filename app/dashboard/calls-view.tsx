@@ -8,7 +8,7 @@ import type { Call, Sentiment } from "@/lib/supabase/types";
 import { StatusBadge } from "@/components/status-badge";
 import { SentimentDot } from "@/components/sentiment-dot";
 import { formatTrDate, resolvedLabel, t } from "@/lib/strings";
-import { cancelAllProcessing, deleteCall, retryAllFailed } from "@/lib/actions";
+import { cancelAllProcessing, deleteCall, reprocessAllSentiment, retryAllFailed } from "@/lib/actions";
 import { kickWorker } from "@/app/dashboard/upload/actions";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -214,6 +214,9 @@ export function CallsView({ initial }: { initial: Call[] }) {
           processingCount={processingCount}
           onRowsUpdated={applyRows}
         />
+      )}
+      {doneCount > 0 && (
+        <ReprocessSentimentBar doneCount={doneCount} onRowsUpdated={applyRows} />
       )}
 
       {/* Search bar */}
@@ -979,6 +982,49 @@ function BulkActionsBar({
           <span>{stopping ? t.queuedShort : t.stopAllProcessing(processingCount)}</span>
         </button>
       )}
+    </div>
+  );
+}
+
+function ReprocessSentimentBar({
+  doneCount, onRowsUpdated,
+}: {
+  doneCount: number;
+  onRowsUpdated: (rows: Call[]) => void;
+}) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [reprocessing, startReprocess] = useTransition();
+
+  async function handleReprocessAll() {
+    const ok = await confirm({
+      title: t.confirmReprocessSentiment,
+      message: t.confirmReprocessSentimentMsg,
+      confirmLabel: t.reprocessSentiment(doneCount),
+      cancelLabel: "İptal",
+    });
+    if (!ok) return;
+    startReprocess(async () => {
+      const res = await reprocessAllSentiment();
+      if (res.error) toast.show(res.error, "error");
+      else {
+        onRowsUpdated(res.rows);
+        toast.show(t.bulkReprocessed(res.count), "success");
+      }
+    });
+  }
+
+  return (
+    <div className="panel p-3 md:p-4 flex flex-wrap items-center gap-2">
+      <div className="me-auto" />
+      <button
+        onClick={handleReprocessAll}
+        disabled={reprocessing}
+        className="btn btn-ghost text-sm inline-flex items-center gap-1.5"
+      >
+        {reprocessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+        <span>{reprocessing ? t.queuedShort : t.reprocessSentiment(doneCount)}</span>
+      </button>
     </div>
   );
 }
