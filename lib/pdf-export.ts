@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { Call } from "@/lib/supabase/types";
 import {
+  cleanTranscript,
   formatTrDate,
   resolvedLabel,
   sentimentLabel,
@@ -108,7 +109,7 @@ export function downloadCallPdf(call: Call) {
   doc.setFont("NotoSans", "normal");
   y += 6;
 
-  const transcript = call.transcript || t.unknown;
+  const transcript = call.transcript ? cleanTranscript(call.transcript) : t.unknown;
   const lines = doc.splitTextToSize(transcript, CONTENT_WIDTH);
   const lineHeight = 5;
   for (const line of lines) {

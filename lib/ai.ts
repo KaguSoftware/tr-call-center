@@ -123,6 +123,7 @@ Sana bir çağrı merkezi temsilcisi ile bir müşteri arasındaki Türkçe bir 
 - Kendinden bir şey ekleme; yalnızca sesin gerçek içeriğine göre yanıt ver.
 - Bilgi seste yoksa, nullable alanlar için null kullan.
 - Sorunun çözülüp çözülmediği belirsizse resolved alanını null bırak.
+- transcript alanına zaman damgası ekleme (örn. "[00:12]" veya "01:23 -" gibi). Sadece konuşmacı ve söylediklerini yaz.
 - sentiment_agent ve sentiment_caller için sesteki gerçek tonu (kelime seçimi, ses tonu, sabır/sabırsızlık, teşekkür/şikayet ifadeleri) dikkatle değerlendir. Bu alanlarda "neutral" yalnızca gerçekten belirgin bir duygusal ton yoksa kullanılmalı; çoğu çağrıda taraflardan en az biri açıkça memnun ya da rahatsız olur, bunu yansıt.`;
 
 // ===== Main entry: audio file → transcript + structured analysis =====

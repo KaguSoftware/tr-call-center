@@ -254,6 +254,17 @@ export function formatTrDate(iso: string | Date): string {
   }
 }
 
+// Strip inline timestamp markers the model sometimes adds to transcripts
+// (e.g. "[00:12]", "(01:23:45)", "00:12 -"), which read as noise rather than
+// useful structure since we don't render a synced audio-position UI.
+const TIMESTAMP_PATTERN = /^\s*[[(]?\d{1,2}:\d{2}(?::\d{2})?[\])]?\s*[-–—:]?\s*/;
+export function cleanTranscript(transcript: string): string {
+  return transcript
+    .split("\n")
+    .map((line) => line.replace(TIMESTAMP_PATTERN, ""))
+    .join("\n");
+}
+
 // Just the date portion (no time) — used for summary range headers.
 export function formatTrDateShort(iso: string | Date): string {
   const d = typeof iso === "string" ? new Date(iso) : iso;
