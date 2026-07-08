@@ -33,11 +33,19 @@ function registerFont(doc: jsPDF) {
   doc.setFont("NotoSans", "normal");
 }
 
-function sanitizeFilename(s: string): string {
+export function sanitizeFilename(s: string): string {
   return s.replace(/[^\p{L}\p{N}_-]+/gu, "_").slice(0, 60);
 }
 
-export function downloadCallPdf(call: Call) {
+export function callPdfFilename(call: Call): string {
+  const namePart = call.caller_name || call.caller_phone || call.id.slice(0, 8);
+  return `cagri-${sanitizeFilename(namePart)}.pdf`;
+}
+
+// Builds the PDF document for a call without saving/downloading it — used
+// both by the single-download path below and the bulk ZIP exporter
+// (lib/zip-export.ts), which needs the raw bytes instead of a browser save.
+export function renderCallPdf(call: Call): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   registerFont(doc);
 
@@ -147,8 +155,12 @@ export function downloadCallPdf(call: Call) {
 
   addPageNumbers(doc);
 
-  const namePart = call.caller_name || call.caller_phone || call.id.slice(0, 8);
-  doc.save(`cagri-${sanitizeFilename(namePart)}.pdf`);
+  return doc;
+}
+
+export function downloadCallPdf(call: Call) {
+  const doc = renderCallPdf(call);
+  doc.save(callPdfFilename(call));
 }
 
 function drawBlockField(doc: jsPDF, y: number, label: string, value: string | null): number {

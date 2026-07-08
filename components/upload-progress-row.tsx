@@ -70,11 +70,12 @@ export function UploadProgressRow({ filename, sizeBytes, phone, state, onRemove,
       </div>
 
       <Status state={state} />
-      {removable && state.kind !== "uploading" && onRemove && (
+      {removable && onRemove && (
         <button
           onClick={onRemove}
           className="btn btn-ghost text-muted px-2"
-          aria-label="Sil"
+          aria-label={state.kind === "uploading" ? t.cancelUpload : "Sil"}
+          title={state.kind === "uploading" ? t.cancelUpload : undefined}
         >
           <X className="w-4 h-4" />
         </button>

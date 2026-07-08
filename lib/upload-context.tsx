@@ -39,6 +39,7 @@ type Ctx = {
   uploading: boolean;
   addFiles: (files: FileList | File[] | null, opts?: { tooLargeMsg?: string }) => void;
   removeItem: (key: string) => void;
+  cancelItem: (key: string) => void;
   clearItems: () => void;
   startAll: (handlers?: {
     onAllDone?: (summary: { successCount: number; errorCount: number; firstId?: string }) => void;
@@ -77,6 +78,14 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
   const removeItem: Ctx["removeItem"] = useCallback((key) => {
     setItems((prev) => prev.filter((i) => i.key !== key));
+  }, []);
+
+  // Aborts an in-progress upload. The XHR's onabort handler already resolves
+  // into { kind: "error", message: "İptal edildi" } and cleans up the
+  // pending DB row (abortPendingCall), so no extra cleanup is needed here.
+  const cancelItem: Ctx["cancelItem"] = useCallback((key) => {
+    const item = itemsRef.current.find((i) => i.key === key);
+    item?.handle?.abort();
   }, []);
 
   const clearItems: Ctx["clearItems"] = useCallback(() => {
@@ -148,8 +157,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<Ctx>(
-    () => ({ items, uploading, addFiles, removeItem, clearItems, startAll }),
-    [items, uploading, addFiles, removeItem, clearItems, startAll]
+    () => ({ items, uploading, addFiles, removeItem, cancelItem, clearItems, startAll }),
+    [items, uploading, addFiles, removeItem, cancelItem, clearItems, startAll]
   );
 
   return <UploadContext.Provider value={value}>{children}</UploadContext.Provider>;

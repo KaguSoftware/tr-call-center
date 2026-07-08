@@ -12,7 +12,7 @@ import { formatTrDuration, t } from "@/lib/strings";
 export function UploadForm() {
   const router = useRouter();
   const toast = useToast();
-  const { items, uploading, addFiles, removeItem, clearItems, startAll } = useUpload();
+  const { items, uploading, addFiles, removeItem, cancelItem, clearItems, startAll } = useUpload();
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -137,8 +137,8 @@ export function UploadForm() {
                   sizeBytes={it.file.size}
                   phone={it.phone}
                   state={it.state}
-                  removable={!uploading}
-                  onRemove={() => removeItem(it.key)}
+                  removable={it.state.kind === "uploading" || !uploading}
+                  onRemove={() => (it.state.kind === "uploading" ? cancelItem(it.key) : removeItem(it.key))}
                 />
               ))}
             </AnimatePresence>

@@ -20,7 +20,8 @@ import { Segmented } from "@/components/segmented";
 import { DateField } from "@/components/date-field";
 import { AnimatePresence } from "framer-motion";
 import { useTrackedAction } from "@/components/activity-bar";
-import { Trash2, Loader2, Play, StopCircle, AlertTriangle, Mic, Search, SlidersHorizontal, X, RotateCcw, Phone, CheckCircle2, Clock } from "lucide-react";
+import { downloadCallsAsZip } from "@/lib/zip-export";
+import { Trash2, Loader2, Play, StopCircle, AlertTriangle, Mic, Search, SlidersHorizontal, X, RotateCcw, Phone, CheckCircle2, Clock, FileDown } from "lucide-react";
 
 type ResolvedFilter = "all" | "yes" | "no";
 type SentimentFilter = "all" | Sentiment;
@@ -28,6 +29,19 @@ type SentimentFilter = "all" | Sentiment;
 export function CallsView({ initial }: { initial: Call[] }) {
   const [calls, setCalls] = useState<Call[]>(initial);
   const track = useTrackedAction();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -59,6 +73,12 @@ export function CallsView({ initial }: { initial: Call[] }) {
     },
     onDelete: (row) => {
       setCalls((prev) => prev.filter((c) => c.id !== row.id));
+      setSelectedIds((prev) => {
+        if (!prev.has(row.id)) return prev;
+        const next = new Set(prev);
+        next.delete(row.id);
+        return next;
+      });
     },
   });
 
@@ -70,6 +90,16 @@ export function CallsView({ initial }: { initial: Call[] }) {
     setCalls((prev) => {
       const byId = new Map(rows.map((r) => [r.id, r] as const));
       return prev.map((c) => byId.get(c.id) ?? c);
+    });
+  }
+
+  function handleDeleted(id: string) {
+    setCalls((prev) => prev.filter((x) => x.id !== id));
+    setSelectedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
     });
   }
 
@@ -155,6 +185,20 @@ export function CallsView({ initial }: { initial: Call[] }) {
     setResolvedF("all"); setSentF("all"); setFrom(""); setTo("");
   }
 
+  const allVisibleSelected = filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id));
+  function toggleSelectAllVisible() {
+    setSelectedIds((prev) => {
+      if (allVisibleSelected) {
+        const next = new Set(prev);
+        for (const c of filtered) next.delete(c.id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const c of filtered) next.add(c.id);
+      return next;
+    });
+  }
+
   const anyFilter = !!(search || agent || category || from || to || resolvedF !== "all" || sentF !== "all");
   const filterCount =
     (agent ? 1 : 0) +
@@ -220,6 +264,12 @@ export function CallsView({ initial }: { initial: Call[] }) {
       )}
       {doneCount > 0 && (
         <ReprocessSentimentBar doneCount={doneCount} onRowsUpdated={applyRows} />
+      )}
+      {selectedIds.size > 0 && (
+        <SelectionActionsBar
+          selectedCalls={calls.filter((c) => selectedIds.has(c.id))}
+          onClearSelection={clearSelection}
+        />
       )}
 
       {/* Search bar */}
@@ -366,6 +416,15 @@ export function CallsView({ initial }: { initial: Call[] }) {
               <table className="tbl">
                 <thead>
                   <tr>
+                    <th className="w-10">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleSelectAllVisible}
+                        aria-label={t.selectAll}
+                        className="align-middle"
+                      />
+                    </th>
                     <th>{t.thDate}</th>
                     <th>{t.thCaller}</th>
                     <th>{t.thAgent}</th>
@@ -384,8 +443,10 @@ export function CallsView({ initial }: { initial: Call[] }) {
                       call={c}
                       allCalls={calls}
                       medianSec={medianSec}
-                      onDeleted={(id) => setCalls((prev) => prev.filter((x) => x.id !== id))}
+                      onDeleted={handleDeleted}
                       onRetried={markRetrying}
+                      selected={selectedIds.has(c.id)}
+                      onToggleSelect={toggleSelect}
                     />
                   ))}
                 </tbody>
@@ -401,8 +462,10 @@ export function CallsView({ initial }: { initial: Call[] }) {
                 call={c}
                 allCalls={calls}
                 medianSec={medianSec}
-                onDeleted={(id) => setCalls((prev) => prev.filter((x) => x.id !== id))}
+                onDeleted={handleDeleted}
                 onRetried={markRetrying}
+                selected={selectedIds.has(c.id)}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
@@ -489,18 +552,33 @@ function DeleteButton({ id, onDeleted, size = "sm" }: { id: string; onDeleted: (
 }
 
 function CallRow({
-  call: c, allCalls, medianSec, onDeleted, onRetried,
+  call: c, allCalls, medianSec, onDeleted, onRetried, selected, onToggleSelect,
 }: {
   call: Call;
   allCalls: Call[];
   medianSec: number | null;
   onDeleted: (id: string) => void;
   onRetried: (id: string) => void;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
 }) {
   const showQueue = c.status === "pending" || c.status === "analyzing" || c.status === "transcribing";
   const isFailed = c.status === "failed";
   return (
-    <tr>
+    <tr className={selected ? "bg-accent/5" : undefined}>
+      <td>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(e) => {
+            e.stopPropagation();
+            onToggleSelect(c.id);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={t.selectCall}
+          className="align-middle"
+        />
+      </td>
       <td>
         <Link href={`/dashboard/calls/${c.id}`} className="block fa-nums text-xs text-muted">
           {formatTrDate(c.created_at)}
@@ -1032,19 +1110,80 @@ function ReprocessSentimentBar({
   );
 }
 
+function SelectionActionsBar({
+  selectedCalls, onClearSelection,
+}: {
+  selectedCalls: Call[];
+  onClearSelection: () => void;
+}) {
+  const toast = useToast();
+  const track = useTrackedAction();
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadable = selectedCalls.filter((c) => c.status === "done");
+
+  function handleDownloadZip() {
+    if (downloadable.length === 0) {
+      toast.show(t.noDownloadableSelected, "info");
+      return;
+    }
+    setDownloading(true);
+    track(() => downloadCallsAsZip(downloadable))
+      .then(() => toast.show(t.zipDownloaded(downloadable.length), "success"))
+      .catch((e) => toast.show(e instanceof Error ? e.message : "ZIP oluşturulamadı", "error"))
+      .finally(() => setDownloading(false));
+  }
+
+  return (
+    <div className="panel p-3 md:p-4 flex flex-wrap items-center gap-2">
+      <span className="text-sm text-muted fa-nums">
+        {t.selectedCount(selectedCalls.length)}
+      </span>
+      <div className="me-auto" />
+      <button onClick={onClearSelection} className="btn btn-ghost text-sm">
+        {t.clearSelection}
+      </button>
+      <button
+        onClick={handleDownloadZip}
+        disabled={downloading}
+        className="btn btn-primary text-sm inline-flex items-center gap-1.5"
+      >
+        {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+        <span>{downloading ? t.queuedShort : t.downloadSelectedZip(downloadable.length)}</span>
+      </button>
+    </div>
+  );
+}
+
 function CallCard({
-  call: c, allCalls, medianSec, onDeleted, onRetried,
+  call: c, allCalls, medianSec, onDeleted, onRetried, selected, onToggleSelect,
 }: {
   call: Call;
   allCalls: Call[];
   medianSec: number | null;
   onDeleted: (id: string) => void;
   onRetried: (id: string) => void;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
 }) {
   const showQueue = c.status === "pending" || c.status === "analyzing" || c.status === "transcribing";
   const isFailed = c.status === "failed";
   return (
-    <Link href={`/dashboard/calls/${c.id}`} className="block panel p-4 active:bg-surface2 transition-colors">
+    <Link
+      href={`/dashboard/calls/${c.id}`}
+      className={"block panel p-4 active:bg-surface2 transition-colors relative " + (selected ? "ring-2 ring-accent" : "")}
+    >
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={(e) => {
+          e.stopPropagation();
+          onToggleSelect(c.id);
+        }}
+        onClick={(e) => e.stopPropagation()}
+        aria-label={t.selectCall}
+        className="absolute top-3 end-3 z-10 h-4 w-4"
+      />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs text-muted fa-nums flex-wrap">
