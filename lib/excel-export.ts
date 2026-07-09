@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { SummaryResult } from "@/lib/summary";
-import { formatTrDateShort, formatTrPercent, t } from "@/lib/strings";
+import type { Call } from "@/lib/supabase/types";
+import { formatTrDate, formatTrDateShort, formatTrPercent, resolvedLabel, sentimentLabel, statusLabel, t } from "@/lib/strings";
 
 function autoWidth(rows: (string | number)[][]): { wch: number }[] {
   const widths: number[] = [];
@@ -85,4 +86,28 @@ export function downloadSummaryExcel(result: SummaryResult, rangeLabel: string) 
 
   const stamp = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `ozet-${stamp}.xlsx`);
+}
+
+export function downloadCallsExcel(calls: Call[]) {
+  const rows: (string | number)[][] = [
+    [t.thDate, t.callerName, t.callerPhone, t.agentName, t.thIssue, t.thCategory, t.thResolved, t.followUp, t.callerSentiment, t.agentSentiment, t.thStatus],
+    ...calls.map((c) => [
+      formatTrDate(c.created_at),
+      c.caller_name || "—",
+      c.caller_phone || "—",
+      c.agent_name || "—",
+      c.issue_summary || "—",
+      c.category || "—",
+      resolvedLabel(c.resolved),
+      c.follow_up_needed === true ? t.yes : c.follow_up_needed === false ? t.no : "—",
+      sentimentLabel(c.sentiment_caller),
+      sentimentLabel(c.sentiment_agent),
+      statusLabel(c.status),
+    ]),
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(rows), "Çağrılar");
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `cagrilar-${stamp}.xlsx`);
 }

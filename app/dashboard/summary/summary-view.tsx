@@ -9,7 +9,7 @@ import { BarList } from "@/components/bar-list";
 import { FadeIn } from "@/components/motion";
 import { Mic, FileDown, Loader2 } from "lucide-react";
 import { formatTrDateShort, formatTrDayMonth, formatTrPercent, t } from "@/lib/strings";
-import { downloadSummaryExcel } from "@/lib/excel-export";
+import { downloadSummaryPdf } from "@/lib/summary-pdf-export";
 import { useTrackedAction } from "@/components/activity-bar";
 import { useToast } from "@/components/toast";
 
@@ -24,19 +24,19 @@ export function SummaryView({ result }: { result: SummaryResult }) {
   const router = useRouter();
   const sp = useSearchParams();
   const [pending, startTransition] = useTransition();
-  const [downloadingExcel, setDownloadingExcel] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const track = useTrackedAction();
   const toast = useToast();
 
-  function handleDownloadExcel() {
-    setDownloadingExcel(true);
+  function handleDownloadPdf() {
+    setDownloadingPdf(true);
     track(async () => {
       try {
-        downloadSummaryExcel(result, RANGE_LABELS[result.range]);
+        downloadSummaryPdf(result, RANGE_LABELS[result.range]);
       } catch (e) {
-        toast.show(e instanceof Error ? e.message : "Excel oluşturulamadı", "error");
+        toast.show(e instanceof Error ? e.message : "PDF oluşturulamadı", "error");
       }
-    }).finally(() => setDownloadingExcel(false));
+    }).finally(() => setDownloadingPdf(false));
   }
 
   function setRange(r: Range) {
@@ -71,12 +71,12 @@ export function SummaryView({ result }: { result: SummaryResult }) {
         </div>
         {result.totalCalls.value > 0 && (
           <button
-            onClick={handleDownloadExcel}
-            disabled={downloadingExcel}
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
             className="btn text-sm inline-flex items-center gap-1.5"
           >
-            {downloadingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-            {t.downloadExcel}
+            {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            {t.downloadPdf}
           </button>
         )}
       </div>

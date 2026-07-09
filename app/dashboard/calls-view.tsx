@@ -8,7 +8,7 @@ import type { Call, Sentiment } from "@/lib/supabase/types";
 import { StatusBadge } from "@/components/status-badge";
 import { SentimentDot } from "@/components/sentiment-dot";
 import { formatTrDate, resolvedLabel, t } from "@/lib/strings";
-import { cancelAllProcessing, deleteCall, reprocessAllSentiment, retryAllFailed } from "@/lib/actions";
+import { cancelAllProcessing, deleteCall, deleteManyCalls, reprocessAllSentiment, retryAllFailed } from "@/lib/actions";
 import { kickWorker } from "@/app/dashboard/upload/actions";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -21,6 +21,7 @@ import { DateField } from "@/components/date-field";
 import { AnimatePresence } from "framer-motion";
 import { useTrackedAction } from "@/components/activity-bar";
 import { downloadCallsAsZip } from "@/lib/zip-export";
+import { downloadCallsExcel } from "@/lib/excel-export";
 import { Trash2, Loader2, Play, StopCircle, AlertTriangle, Mic, Search, SlidersHorizontal, X, RotateCcw, Phone, CheckCircle2, Clock, FileDown } from "lucide-react";
 
 type ResolvedFilter = "all" | "yes" | "no";
@@ -99,6 +100,16 @@ export function CallsView({ initial }: { initial: Call[] }) {
       if (!prev.has(id)) return prev;
       const next = new Set(prev);
       next.delete(id);
+      return next;
+    });
+  }
+
+  function handleManyDeleted(ids: string[]) {
+    const idSet = new Set(ids);
+    setCalls((prev) => prev.filter((x) => !idSet.has(x.id)));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.delete(id);
       return next;
     });
   }
@@ -198,6 +209,16 @@ export function CallsView({ initial }: { initial: Call[] }) {
       return next;
     });
   }
+  function invertSelectionVisible() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const c of filtered) {
+        if (next.has(c.id)) next.delete(c.id);
+        else next.add(c.id);
+      }
+      return next;
+    });
+  }
 
   const anyFilter = !!(search || agent || category || from || to || resolvedF !== "all" || sentF !== "all");
   const filterCount =
@@ -269,6 +290,10 @@ export function CallsView({ initial }: { initial: Call[] }) {
         <SelectionActionsBar
           selectedCalls={calls.filter((c) => selectedIds.has(c.id))}
           onClearSelection={clearSelection}
+          onSelectAllVisible={toggleSelectAllVisible}
+          onInvertSelection={invertSelectionVisible}
+          allVisibleSelected={allVisibleSelected}
+          onManyDeleted={handleManyDeleted}
         />
       )}
 
@@ -1111,14 +1136,21 @@ function ReprocessSentimentBar({
 }
 
 function SelectionActionsBar({
-  selectedCalls, onClearSelection,
+  selectedCalls, onClearSelection, onSelectAllVisible, onInvertSelection, allVisibleSelected, onManyDeleted,
 }: {
   selectedCalls: Call[];
   onClearSelection: () => void;
+  onSelectAllVisible: () => void;
+  onInvertSelection: () => void;
+  allVisibleSelected: boolean;
+  onManyDeleted: (ids: string[]) => void;
 }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const track = useTrackedAction();
-  const [downloading, setDownloading] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const downloadable = selectedCalls.filter((c) => c.status === "done");
 
@@ -1127,12 +1159,50 @@ function SelectionActionsBar({
       toast.show(t.noDownloadableSelected, "info");
       return;
     }
-    setDownloading(true);
+    setDownloadingZip(true);
     track(() => downloadCallsAsZip(downloadable))
       .then(() => toast.show(t.zipDownloaded(downloadable.length), "success"))
       .catch((e) => toast.show(e instanceof Error ? e.message : "ZIP oluşturulamadı", "error"))
-      .finally(() => setDownloading(false));
+      .finally(() => setDownloadingZip(false));
   }
+
+  function handleDownloadExcel() {
+    if (downloadable.length === 0) {
+      toast.show(t.noDownloadableSelected, "info");
+      return;
+    }
+    setDownloadingExcel(true);
+    track(async () => downloadCallsExcel(downloadable))
+      .then(() => toast.show(t.excelDownloaded(downloadable.length), "success"))
+      .catch((e) => toast.show(e instanceof Error ? e.message : "Excel oluşturulamadı", "error"))
+      .finally(() => setDownloadingExcel(false));
+  }
+
+  async function handleDeleteSelected() {
+    const ok = await confirm({
+      title: t.confirmDeleteSelected,
+      message: t.confirmDeleteSelectedMsg(selectedCalls.length),
+      confirmLabel: t.deleteSelected(selectedCalls.length),
+      cancelLabel: "İptal",
+      kind: "danger",
+    });
+    if (!ok) return;
+    setDeleting(true);
+    const ids = selectedCalls.map((c) => c.id);
+    track(() => deleteManyCalls(ids))
+      .then((res) => {
+        if (res.error) {
+          toast.show(res.error, "error");
+          return;
+        }
+        onManyDeleted(ids);
+        toast.show(t.bulkDeleted(res.count), "success");
+      })
+      .catch((e) => toast.show(e instanceof Error ? e.message : "Silme başarısız oldu", "error"))
+      .finally(() => setDeleting(false));
+  }
+
+  const busy = downloadingZip || downloadingExcel || deleting;
 
   return (
     <div className="panel p-3 md:p-4 flex flex-wrap items-center gap-2">
@@ -1140,16 +1210,38 @@ function SelectionActionsBar({
         {t.selectedCount(selectedCalls.length)}
       </span>
       <div className="me-auto" />
+      <button onClick={onSelectAllVisible} className="btn btn-ghost text-sm">
+        {allVisibleSelected ? t.clearSelection : t.selectAllVisible}
+      </button>
+      <button onClick={onInvertSelection} className="btn btn-ghost text-sm">
+        {t.invertSelection}
+      </button>
       <button onClick={onClearSelection} className="btn btn-ghost text-sm">
         {t.clearSelection}
       </button>
       <button
-        onClick={handleDownloadZip}
-        disabled={downloading}
-        className="btn btn-primary text-sm inline-flex items-center gap-1.5"
+        onClick={handleDownloadExcel}
+        disabled={busy}
+        className="btn text-sm inline-flex items-center gap-1.5"
       >
-        {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-        <span>{downloading ? t.queuedShort : t.downloadSelectedZip(downloadable.length)}</span>
+        {downloadingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+        <span>{downloadingExcel ? t.queuedShort : t.downloadSelectedExcel(downloadable.length)}</span>
+      </button>
+      <button
+        onClick={handleDownloadZip}
+        disabled={busy}
+        className="btn text-sm inline-flex items-center gap-1.5"
+      >
+        {downloadingZip ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+        <span>{downloadingZip ? t.queuedShort : t.downloadSelectedZip(downloadable.length)}</span>
+      </button>
+      <button
+        onClick={handleDeleteSelected}
+        disabled={busy}
+        className="btn btn-danger text-sm inline-flex items-center gap-1.5"
+      >
+        {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+        <span>{deleting ? t.queuedShort : t.deleteSelected(selectedCalls.length)}</span>
       </button>
     </div>
   );

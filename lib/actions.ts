@@ -36,6 +36,36 @@ export async function deleteCall(id: string): Promise<{ error?: string }> {
 	return {};
 }
 
+// Bulk delete for the dashboard multiselect toolbar. Mirrors deleteCall's
+// storage-then-row cleanup, but batches the storage removal into a single
+// call and reports how many rows were actually deleted.
+export async function deleteManyCalls(ids: string[]): Promise<{ count: number; error?: string }> {
+	if (ids.length === 0) return { count: 0 };
+	const sb = await createClient();
+
+	const { data: rows } = await sb
+		.from("calls")
+		.select("audio_path")
+		.in("id", ids);
+
+	const paths = (rows ?? [])
+		.map((r) => r.audio_path)
+		.filter((p): p is string => !!p && p !== "pending");
+	if (paths.length > 0) {
+		await sb.storage.from("call-audio").remove(paths);
+	}
+
+	const { data: deleted, error } = await sb
+		.from("calls")
+		.delete()
+		.in("id", ids)
+		.select("id");
+	if (error) return { count: 0, error: error.message };
+
+	revalidatePath("/dashboard");
+	return { count: deleted?.length ?? 0 };
+}
+
 export async function cancelCall(id: string): Promise<{ error?: string }> {
 	const sb = await createClient();
 
